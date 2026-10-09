@@ -4,8 +4,6 @@ const reduced = matchMedia('(prefers-reduced-motion: reduce)');
 const mobile = matchMedia('(max-width: 700px)');
 const clamp = (n,a=0,b=1) => Math.max(a,Math.min(b,n));
 document.body.classList.add('motion-ready');
-const observer = new IntersectionObserver(entries => entries.forEach(e => { if(e.isIntersecting){e.target.classList.add('visible');observer.unobserve(e.target);} }),{threshold:.12});
-$$('.reveal').forEach(el => observer.observe(el));
 
 let sceneIndex = 0;
 function showScene(index) {
@@ -144,3 +142,47 @@ const faqMarkup = x => `<details class="faq-item"><summary>${x[1]}</summary><p>$
 $('#shortFaq').innerHTML=faqs.slice(0,5).map(faqMarkup).join('');
 $('#moreFaq').innerHTML=faqs.slice(5).map(faqMarkup).join('');
 $('#moreFaqButton').addEventListener('click',()=>{const more=$('#moreFaq');more.hidden=!more.hidden;$('#moreFaqButton').setAttribute('aria-expanded',String(!more.hidden));$('#moreFaqButton').innerHTML=more.hidden?'Все 20 вопросов <span>+</span>':'Свернуть вопросы <span>−</span>';});
+
+
+// Re-entering the viewport replays the entrance, without touching scroll transforms.
+const entranceSelectors = '.eyebrow, .gallery-card, .scene-window, .scene-nav button, .services-heading .lead, .material-list button, .price-card, .reviews-intro, .video-review, .faq-item, .footer-content h2, .footer-content > .pill, .footer-links';
+$$(entranceSelectors).forEach(el => {
+ if (!el.classList.contains('reveal') && !el.parentElement.closest('.reveal')) el.classList.add('reveal');
+});
+$$('.gallery-grid, .benefits, .price-grid, .video-reviews, .scene-nav, .material-list').forEach(group => {
+ [...group.children].forEach((el, i) => el.style.setProperty('--reveal-delay', `${(i % 4) * 85}ms`));
+});
+const entranceElements = $$('.reveal');
+const entranceObserver = new IntersectionObserver(entries => {
+ entries.forEach(entry => entry.target.classList.toggle('visible', reduced.matches || entry.isIntersecting));
+}, {threshold: 0, rootMargin: '0px 0px -24px 0px'});
+function configureEntrances() {
+ entranceObserver.disconnect();
+ entranceElements.forEach(el => {
+  if (reduced.matches) el.classList.add('visible');
+  else entranceObserver.observe(el);
+ });
+}
+configureEntrances();
+reduced.addEventListener('change', configureEntrances);
+
+// A small direction threshold prevents the glass header from flickering on trackpads.
+const siteHeader = $('.header');
+let headerLastY = Math.max(0, scrollY), headerDirection = 0, headerTravel = 0, headerFrame = 0;
+siteHeader.classList.toggle('is-glass', headerLastY > 80);
+siteHeader.classList.toggle('is-hidden', headerLastY > 160);
+function updateHeader() {
+ headerFrame = 0;
+ const y = clamp(scrollY, 0, Math.max(0, document.documentElement.scrollHeight - innerHeight));
+ const delta = y - headerLastY;
+ siteHeader.classList.toggle('is-glass', y > 80);
+ if (y < 80) { siteHeader.classList.remove('is-hidden'); headerTravel = 0; }
+ else if (Math.abs(delta) > 0.5) {
+  const direction = Math.sign(delta);
+  if (direction !== headerDirection) headerTravel = 0;
+  headerTravel += Math.abs(delta); headerDirection = direction;
+  if (headerTravel > 24) siteHeader.classList.toggle('is-hidden', direction > 0 && y > 160);
+ }
+ headerLastY = y;
+}
+addEventListener('scroll', () => { if (!headerFrame) headerFrame = requestAnimationFrame(updateHeader); }, {passive: true});
