@@ -51,6 +51,53 @@ function updateMotion(){
 function schedule(){if(!frame)frame=requestAnimationFrame(updateMotion);}
 addEventListener('scroll',schedule,{passive:true});addEventListener('resize',schedule);reduced.addEventListener('change',schedule);mobile.addEventListener('change',schedule);schedule();
 
+// Individual translate composes with the existing scroll transforms.
+const pointerDevice = matchMedia('(hover: hover) and (pointer: fine)');
+const heroStage = $('.hero-stage');
+const pointerLayers = [
+ {el:$('.hero-person'),x:26,y:16},
+ {el:$('.hero-art h1'),x:-18,y:-11},
+ {el:$('.hero-meta'),x:-8,y:-5},
+ {el:$('.glow-one'),x:42,y:24},
+ {el:$('.glow-two'),x:-30,y:-18}
+];
+let pointerFrame=0, pointerTime=0, pointerX=0, pointerY=0, targetX=0, targetY=0, heroVisible=true;
+const pointerEnabled=()=>pointerDevice.matches&&!mobile.matches&&!reduced.matches&&heroVisible&&document.visibilityState!=='hidden';
+function paintPointer(){
+ pointerLayers.forEach(({el,x,y})=>{el.style.translate=`${(pointerX*x).toFixed(3)}px ${(pointerY*y).toFixed(3)}px`;});
+}
+function animatePointer(time){
+ pointerFrame=0;
+ const dt=pointerTime?Math.min(64,time-pointerTime):16.7;
+ pointerTime=time;
+ const ease=1-Math.exp(-dt/140);
+ pointerX+=(targetX-pointerX)*ease;pointerY+=(targetY-pointerY)*ease;
+ const settled=Math.abs(targetX-pointerX)<.0005&&Math.abs(targetY-pointerY)<.0005;
+ if(settled){pointerX=targetX;pointerY=targetY;pointerTime=0;}
+ paintPointer();
+ if(!settled)pointerFrame=requestAnimationFrame(animatePointer);
+}
+function schedulePointer(){if(!pointerFrame)pointerFrame=requestAnimationFrame(animatePointer);}
+function resetPointer(immediate=false){
+ targetX=0;targetY=0;
+ if(immediate){cancelAnimationFrame(pointerFrame);pointerFrame=0;pointerTime=0;pointerX=0;pointerY=0;paintPointer();}
+ else schedulePointer();
+}
+heroStage.addEventListener('pointermove',event=>{
+ if(event.pointerType==='touch'||!pointerEnabled())return;
+ const r=heroStage.getBoundingClientRect();
+ targetX=clamp((event.clientX-r.left)/r.width*2-1,-1,1);
+ targetY=clamp((event.clientY-r.top)/r.height*2-1,-1,1);
+ schedulePointer();
+},{passive:true});
+heroStage.addEventListener('pointerleave',()=>resetPointer());
+heroStage.addEventListener('pointercancel',()=>resetPointer(true));
+addEventListener('blur',()=>resetPointer(true));
+addEventListener('resize',()=>resetPointer(true),{passive:true});
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')resetPointer(true);});
+[pointerDevice,mobile,reduced].forEach(query=>query.addEventListener('change',()=>resetPointer(true)));
+new IntersectionObserver(entries=>{heroVisible=entries[0].isIntersecting;if(!heroVisible)resetPointer(true);}).observe(heroStage);
+
 const lessons=[
  ['Диагностика текущей ситуации','Определите свою точку старта: цели, текущие возможности и вопросы, с которыми вы приходите в недвижимость. Это основа для выбора дальнейшего пути.'],
  ['Виды недвижимости','Познакомьтесь с видами недвижимости и научитесь соотносить форматы объектов со своими целями и ресурсами.'],
