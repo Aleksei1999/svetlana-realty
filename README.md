@@ -2,24 +2,20 @@
 
 Два самостоятельных варианта сайта образовательных программ «Старт» и «Магия доходной недвижимости».
 
-| Вариант | Исходники | Опубликованный сайт |
+## Открыть сайты
+
+- **[Вариант 1 — архитектура и стратегия](https://aleksei1999.github.io/svetlana-realty/variant-1/)**
+- **[Вариант 2 — портрет и движение](https://aleksei1999.github.io/svetlana-realty/variant-2/)**
+- [Страница выбора двух вариантов](https://aleksei1999.github.io/svetlana-realty/)
+
+Сайты доступны без входа в ChatGPT. GitHub Pages публикует корень ветки `site-variants`; изменения в этой ветке автоматически обновляют сайты.
+
+| Вариант | Исходники | Предыдущая публикация в Sites |
 | --- | --- | --- |
-| 1 — архитектурная композиция, бордовая палитра | [variant-1](variant-1/) | https://svetlana-realty-start.ammfund.chatgpt.site/ |
-| 2 — крупный портрет и анимации прокрутки | [variant-2](variant-2/) | https://svetlana-realty-motion.ammfund.chatgpt.site/ |
+| 1 — архитектурная композиция, бордовая палитра | [variant-1](variant-1/) | [Открыть в Sites](https://svetlana-realty-start.ammfund.chatgpt.site/) |
+| 2 — крупный портрет и анимации прокрутки | [variant-2](variant-2/) | [Открыть в Sites](https://svetlana-realty-motion.ammfund.chatgpt.site/) |
 
-Опубликованные ссылки могут требовать входа в аккаунт владельца в ChatGPT. Исходники запускаются независимо от ChatGPT и не требуют сборки.
-
-## Просмотр через GitHub Pages
-
-Подготовлена [страница выбора двух вариантов](index.html). GitHub Pages пока не включён: репозиторий приватный, а тариф GitHub Free поддерживает Pages только для публичных репозиториев. Изменение доступа ожидает подтверждения владельца.
-
-После включения Pages для корня ветки `site-variants` будут доступны адреса:
-
-- `https://aleksei1999.github.io/svetlana-realty/` — выбор варианта.
-- `https://aleksei1999.github.io/svetlana-realty/variant-1/` — первый сайт.
-- `https://aleksei1999.github.io/svetlana-realty/variant-2/` — второй сайт.
-
-Эти адреса ещё не опубликованы.
+Предыдущие публикации в Sites могут требовать входа в ChatGPT. Исходники запускаются независимо от ChatGPT и не требуют сборки.
 
 ## Запуск
 
