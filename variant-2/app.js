@@ -117,7 +117,34 @@ const reviewPlayers=$$('[data-review-video]');
 reviewPlayers.forEach(card=>{
  const video=card.querySelector('video'),button=card.querySelector('.review-play'),status=card.querySelector('.video-status');
  const showError=()=>{card.classList.remove('is-playing');status.hidden=false;status.textContent='Не удалось загрузить видео. Попробуйте ещё раз.';};
- button.addEventListener('click',()=>{status.hidden=true;video.play().catch(showError);});
+ let stream = null, streamReady = false, loading = false;
+ async function prepareStream() {
+  const src = video.dataset.hlsSrc;
+  if (!src || streamReady) return;
+  if (video.canPlayType('application/vnd.apple.mpegurl')) {
+   video.src = src; streamReady = true;
+  } else if (window.Hls && Hls.isSupported()) {
+   await new Promise((resolve, reject) => {
+    stream = new Hls({maxBufferLength:30, maxMaxBufferLength:60, backBufferLength:30});
+    stream.on(Hls.Events.MANIFEST_PARSED, () => {streamReady = true; resolve();});
+    stream.on(Hls.Events.ERROR, (_, data) => {
+     if (!data.fatal) return;
+     stream.destroy(); stream = null; streamReady = false;
+     video.pause(); showError(); reject(new Error('Video stream unavailable'));
+    });
+    stream.loadSource(src); stream.attachMedia(video);
+   });
+  } else { throw new Error('Video stream unsupported'); }
+  video.controls = true;
+ }
+ button.addEventListener('click', async () => {
+  if (loading) return;
+  status.hidden = true; loading = true;
+  button.disabled = true; card.setAttribute('aria-busy','true');
+  try { await prepareStream(); await video.play(); }
+  catch (_) { showError(); }
+  finally { loading = false; button.disabled = false; card.removeAttribute('aria-busy'); }
+ });
  video.addEventListener('play',()=>{
   reviewPlayers.forEach(other=>{const player=other.querySelector('video');if(player!==video)player.pause();});
   card.classList.add('is-playing');status.hidden=true;
