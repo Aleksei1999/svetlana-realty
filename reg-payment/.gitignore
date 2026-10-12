@@ -1,0 +1,5 @@
+config.json
+*.sqlite*
+sessions/
+locks/
+*.log

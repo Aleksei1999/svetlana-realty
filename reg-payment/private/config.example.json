@@ -1,0 +1,15 @@
+{
+  "enabled": false,
+  "shop_id": "1362860",
+  "secret_key": "",
+  "mode": "live",
+  "base_url": "https://www.xn--80ajklwp.site",
+  "receipt": {"vat_code": null, "payment_mode": "", "payment_subject": "", "tax_system_code": null},
+  "offer_url": "",
+  "privacy_url": "",
+  "consent_url": "",
+  "consent_version": "",
+  "documents_approved": false,
+  "fulfillment_ready": false,
+  "test_payment_verified": false
+}

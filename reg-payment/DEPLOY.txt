@@ -1,0 +1,29 @@
+REG.RU payment module, PHP 8.3 + curl + PDO SQLite.
+
+private/* must be copied to /var/www/u3681014/data/realty-private (0700), outside www.
+public/api and public/checkout are copied to /var/www/u3681014/data/www/xn--80ajklwp.site/.
+Run private/initialize.php with /opt/php/8.3/bin/php; it never overwrites an existing config.
+Config, database and sessions must never be committed or uploaded to the public website.
+
+Webhook URL: https://www.xn--80ajklwp.site/api/index.php?action=webhook
+YooKassa events: payment.succeeded, payment.canceled, payment.waiting_for_capture.
+Every event triggers an authenticated GET to YooKassa; the event body is never proof of payment.
+The browser status endpoint requires the order owner's secure session and a CSRF token.
+Payment amount is fixed server-side: 4990.00 RUB. A client-supplied amount is ignored.
+
+Before enabling:
+- Configure secret_key privately on the server, and the matching shop_id/mode.
+- Configure actual merchant receipt VAT/payment_mode/payment_subject; examples in tests are fixtures only.
+- Verify a TEST-shop payment before enabling live sales.
+- Publish merchant-approved offer/privacy/consent documents and configure their URLs/version.
+- Complete fulfillment (Telegram bot) before setting fulfillment_ready=true.
+- Set enabled=true only after the other production gates are satisfied.
+- Configure YooKassa notifications in the authenticated merchant dashboard.
+
+No YooKassa credentials or bot credentials are included.
+Bot fulfillment is deliberately not implemented in this payment-only module yet.
+A succeeded payment is recorded but does not issue an invitation until the bot integration is added.
+Refunds are handled in YooKassa; automatic access revocation for refunds is not implemented yet.
+
+Testing: /opt/php/8.3/bin/php tests/payment-test.php
+The suite uses a fake transport and temporary SQLite database; it never contacts YooKassa or charges money.
