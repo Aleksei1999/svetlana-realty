@@ -22,6 +22,7 @@ function payment_missing(array $c): array {
         foreach (['documents_approved', 'fulfillment_ready', 'test_payment_verified'] as $key) {
             if (($c[$key] ?? false) !== true) $missing[] = $key;
         }
+        if (empty($c['consent_version'])) $missing[] = 'consent_version';
         foreach (['offer_url', 'privacy_url', 'consent_url'] as $key) {
             if (!preg_match('~^https://(?:www\.)?xn--80ajklwp\.site/[^\s]+$~', $c[$key] ?? '')) $missing[] = $key;
         }
@@ -47,9 +48,15 @@ function payment_db(string $dir): PDO {
 function payment_rate(PDO $db, string $bucket, int $limit, int $seconds): void {
     $window = intdiv(time(), $seconds);
     $key = hash('sha256', $bucket . ':' . $window);
-    $s = $db->prepare('INSERT INTO rate_limits VALUES (?,1,?) ON CONFLICT(bucket) DO UPDATE SET count=count+1 RETURNING count');
-    $s->execute([$key, ($window + 1) * $seconds]);
-    if ((int)$s->fetchColumn() > $limit) throw new PaymentError(429, 'Слишком много запросов. Попробуйте немного позже.');
+    $db->beginTransaction();
+    try {
+        $s = $db->prepare('INSERT OR IGNORE INTO rate_limits VALUES (?,0,?)');
+        $s->execute([$key, ($window + 1) * $seconds]);
+        $s = $db->prepare('UPDATE rate_limits SET count=count+1 WHERE bucket=?'); $s->execute([$key]);
+        $s = $db->prepare('SELECT count FROM rate_limits WHERE bucket=?'); $s->execute([$key]);
+        $count = (int)$s->fetchColumn(); $db->commit();
+    } catch (Throwable $e) { $db->rollBack(); throw $e; }
+    if ($count > $limit) throw new PaymentError(429, 'Слишком много запросов. Попробуйте немного позже.');
     $db->exec('DELETE FROM rate_limits WHERE expires < ' . (time() - 3600));
 }
 function payment_customer(array $input): array {

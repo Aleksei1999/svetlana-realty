@@ -21,7 +21,7 @@ foreach(['amount','currency','shop','mode','metadata','id','paid'] as $field){$b
 payment_apply($db,$row,$success);$paid=payment_find($db,$row['id']);ok($paid['status']==='succeeded'&&$paid['paid_at']!==null,'verified success stored');
 payment_apply($db,$row,$success);ok(payment_find($db,$row['id'])['paid_at']===$paid['paid_at'],'duplicate webhook is idempotent');
 $stale=$success;$stale['status']='pending';$stale['paid']=false;payment_apply($db,$row,$stale);ok(payment_find($db,$row['id'])['status']==='succeeded','stale notification cannot downgrade success');
-$public=payment_public($paid);ok(!isset($public['email'],$public['name'],$public['payload'],$public['owner']),'status excludes private customer fields');
+$public=payment_public($paid);ok(array_intersect_key($public,array_fill_keys(['email','name','payload','owner'],true))===[],'status excludes private customer fields');
 $input['request_id']=str_repeat('b',32);$attempts=[];
 $timeout=function($m,$p,$body,$key)use(&$attempts){$attempts[]=$key;throw new PaymentError(503,'timeout');};
 rejects(fn()=>payment_order($db,$c,'owner-2',$input,$timeout),'ambiguous API failure recorded');
