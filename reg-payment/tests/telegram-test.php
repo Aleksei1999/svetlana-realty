@@ -48,4 +48,9 @@ $a2=telegram_access($db,$r2['id']);$db->prepare('UPDATE telegram_access SET invi
 $before=count($calls);$j2['chat']['id']=-100999;telegram_join($db,$tc,$j2,$api,$tg);ok(count($calls)===$before,'other chats ignored');
 $closed=$tc;$closed['enabled']=false;no(fn()=>telegram_update($db,$closed,['update_id'=>100,'message'=>$msg],$api,$tg),'disabled bot fails closed');
 ok(countCalls('createChatInviteLink')===2,'only two independently paid confirmed orders created invitations');
+$seen=[];
+no(fn()=>telegram_batch($db,[['update_id'=>400],['update_id'=>401]],function($u)use(&$seen){if($u['update_id']===401)throw new PaymentError(503,'retry');$seen[]=$u['update_id'];}),'poll batch failure is retryable');
+ok(telegram_cursor($db)===401,'poll offset never acknowledges failed event');
+telegram_batch($db,[['update_id'=>400],['update_id'=>401]],function($u)use(&$seen){$seen[]=$u['update_id'];});
+ok($seen===[400,401]&&telegram_cursor($db)===402,'poll retry skips success and processes failed event');
 $db=null;foreach(glob($tmp.'/*')as$f)unlink($f);rmdir($tmp);echo "OK: $n Telegram assertions; all transports simulated; no real payments or invitations".PHP_EOL;

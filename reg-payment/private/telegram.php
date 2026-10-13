@@ -16,10 +16,11 @@ function telegram_db(PDO $db): void {
         invite_url TEXT UNIQUE, invite_expires INTEGER, sent_at INTEGER,
         state TEXT NOT NULL DEFAULT "unbound", revoke_pending INTEGER NOT NULL DEFAULT 0
     )');
+    $db->exec('CREATE TABLE IF NOT EXISTS telegram_runtime (key TEXT PRIMARY KEY,value TEXT NOT NULL)');
     $db->exec('CREATE TABLE IF NOT EXISTS telegram_updates (id INTEGER PRIMARY KEY, processed_at INTEGER NOT NULL)');
 }
 function telegram_api(array $c, string $method, array $params=[]): mixed {
-    if (!in_array($method,['getMe','getChat','getChatMember','getWebhookInfo','setWebhook','sendMessage','createChatInviteLink','revokeChatInviteLink','approveChatJoinRequest','declineChatJoinRequest'],true)) throw new RuntimeException('Unsupported Telegram method');
+    if (!in_array($method,['getUpdates','deleteWebhook','getMe','getChat','getChatMember','getWebhookInfo','setWebhook','sendMessage','createChatInviteLink','revokeChatInviteLink','approveChatJoinRequest','declineChatJoinRequest'],true)) throw new RuntimeException('Unsupported Telegram method');
     $h=curl_init('https://api.telegram.org/bot'.$c['token'].'/'.$method);
     curl_setopt_array($h,[CURLOPT_POST=>true,CURLOPT_POSTFIELDS=>json_encode($params?:new stdClass,JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR),
         CURLOPT_HTTPHEADER=>['Content-Type: application/json'],CURLOPT_RETURNTRANSFER=>true,CURLOPT_CONNECTTIMEOUT=>5,CURLOPT_TIMEOUT=>12,
@@ -169,4 +170,20 @@ function telegram_update(PDO $db, array $c, array $update, callable $payments, c
     elseif (isset($update['message'])) telegram_start($db,$c,$update['message'],$payments,$tg);
     $s=$db->prepare('INSERT OR IGNORE INTO telegram_updates VALUES(?,?)');$s->execute([$id,time()]);
     $db->exec('DELETE FROM telegram_updates WHERE processed_at < '.(time()-7*86400));
+}
+
+function telegram_cursor(PDO $db): int {
+    $s=$db->query('SELECT value FROM telegram_runtime WHERE key="offset"');return (int)($s->fetchColumn()?:0);
+}
+function telegram_runtime_set(PDO $db,string $key,string $value): void {
+    $s=$db->prepare('INSERT OR REPLACE INTO telegram_runtime(key,value) VALUES(?,?)');$s->execute([$key,$value]);
+}
+function telegram_batch(PDO $db,array $updates,callable $process): void {
+    foreach($updates as$update){
+        $id=$update['update_id']??null;
+        if(!is_int($id)||$id<0)throw new RuntimeException('Invalid Telegram batch');
+        if($id<telegram_cursor($db))continue;
+        $process($update); // A failed update is never acknowledged; next poll retries it.
+        telegram_runtime_set($db,'offset',(string)($id+1));
+    }
 }

@@ -24,6 +24,10 @@ No YooKassa credentials or bot credentials are included.
 Telegram fulfillment is implemented in private/telegram.php and action=telegram.
 Runtime telegram-token.txt and telegram-config.json remain outside webroot, mode 0600.
 After install and passing tests, run private/telegram-setup.php from its deployed directory.
+REG.RU inbound Telegram requests timed out in verification; use polling on this hosting:
+Run telegram-setup.php --poll, then install a per-minute cron for private/telegram-poll.php.
+The poller uses outgoing IPv6, keeps a private persistent update offset, and never acknowledges
+a failed update. It holds a separate worker lock so jobs cannot overlap. Normal latency is up to a minute.
 It checks the configured bot and administrator invitation rights, creates a private webhook secret,
 and registers the HTTPS webhook. It does NOT enable YooKassa sales or mark fulfillment_ready.
 Incoming updates require the exact Telegram secret header. Duplicate updates are recorded.
