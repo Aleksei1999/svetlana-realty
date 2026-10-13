@@ -1,6 +1,7 @@
 <?php
 declare(strict_types=1);
 require_once __DIR__ . '/core.php';
+require_once __DIR__ . '/telegram.php';
 ini_set('display_errors', '0');
 umask(0077);
 header('Content-Type: application/json; charset=utf-8');
@@ -21,7 +22,18 @@ try {
     $c = payment_config(__DIR__);
     $db = payment_db(__DIR__);
     $api = fn($method,$path,$body=null,$key=null) => payment_api($c,$method,$path,$body,$key);
+    $tc=telegram_config(__DIR__);
+    telegram_db($db);
+    $tg=fn($method,$params=[])=>telegram_api($tc,$method,$params);
+    $public=function($row)use($db,$tc,$c){$result=payment_public($row);$result['telegram']=telegram_browser($db,$tc,$c,$row);return $result;};
     $action = $_GET['action'] ?? '';
+    if ($action==='telegram') {
+        if ($_SERVER['REQUEST_METHOD']!=='POST') throw new PaymentError(405,'POST required');
+        telegram_auth($tc,$_SERVER['HTTP_X_TELEGRAM_BOT_API_SECRET_TOKEN']??'');
+        $update=request_json();
+        telegram_lock(__DIR__,fn()=>telegram_update($db,$tc,$update,$api,$tg));
+        respond(['received'=>true]);
+    }
     $ip = hash_hmac('sha256', $_SERVER['REMOTE_ADDR'] ?? 'unknown', (string)$c['installation_secret']);
     if ($action === 'webhook') {
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') throw new PaymentError(405,'POST required');
@@ -66,7 +78,24 @@ try {
         $lock=fopen(__DIR__.'/locks/'.$owner.'.lock','c');
         if (!$lock || !flock($lock,LOCK_EX|LOCK_NB)) throw new PaymentError(409,'Заказ уже создаётся. Повторите проверку через несколько секунд.');
         try { $row=payment_order($db,$c,$owner,$input,$api); } finally { flock($lock,LOCK_UN); fclose($lock); }
-        respond(payment_public($row));
+        respond($public($row));
+    }
+    if (in_array($action,['telegram-confirm','telegram-reset'],true)) {
+        payment_rate($db,'telegram-browser:'.$ip,20,60);
+        $id=$input['order_id']??'';
+        $row=is_string($id)?payment_find($db,$id):null;
+        if (!$row || !hash_equals($row['owner'],$owner)) throw new PaymentError(404,'Заказ не найден в этом браузере.');
+        if (($tc['enabled']??false)!==true) throw new PaymentError(503,'Выдача доступа ещё настраивается.');
+        telegram_lock(__DIR__,function()use($action,$db,$tc,$id,$input,$api,$tg){
+            if ($action==='telegram-confirm') {
+                $candidate=$input['candidate_id']??'';
+                if (!is_string($candidate)) throw new PaymentError(422,'Выберите аккаунт.');
+                telegram_confirm($db,$tc,$id,$candidate,$api,$tg);
+            } else {
+                $s=$db->prepare('UPDATE telegram_access SET candidate_id=NULL,candidate_name=NULL,candidate_username=NULL WHERE order_id=? AND user_id IS NULL');$s->execute([$id]);
+            }
+        });
+        respond($public(payment_find($db,$id)));
     }
     if ($action==='status') {
         payment_rate($db,'status:'.$ip,60,60);
@@ -77,7 +106,7 @@ try {
         if ($row['payment_id'] && !in_array($row['status'],['succeeded','canceled'],true) && time()-(int)$row['checked_at']>=5) {
             $verified=$api('GET','payments/'.$row['payment_id']); payment_apply($db,$row,$verified); $row=payment_find($db,$id);
         }
-        respond(payment_public($row));
+        respond($public($row));
     }
     throw new PaymentError(404,'Not found');
 } catch (PaymentError $e) { respond(['error'=>$e->getMessage()],$e->http); }

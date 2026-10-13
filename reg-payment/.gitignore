@@ -3,3 +3,6 @@ config.json
 sessions/
 locks/
 *.log
+
+telegram-config.json
+telegram-token.txt

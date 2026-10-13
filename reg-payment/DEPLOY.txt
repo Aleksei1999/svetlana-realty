@@ -21,9 +21,27 @@ Before enabling:
 - Configure YooKassa notifications in the authenticated merchant dashboard.
 
 No YooKassa credentials or bot credentials are included.
-Bot fulfillment is deliberately not implemented in this payment-only module yet.
-A succeeded payment is recorded but does not issue an invitation until the bot integration is added.
+Telegram fulfillment is implemented in private/telegram.php and action=telegram.
+Runtime telegram-token.txt and telegram-config.json remain outside webroot, mode 0600.
+After install and passing tests, run private/telegram-setup.php from its deployed directory.
+It checks the configured bot and administrator invitation rights, creates a private webhook secret,
+and registers the HTTPS webhook. It does NOT enable YooKassa sales or mark fulfillment_ready.
+Incoming updates require the exact Telegram secret header. Duplicate updates are recorded.
+The payment owner's browser alone receives an opaque bot claim link, after a verified live success.
+Opening that link only proposes a Telegram account. Buyer must explicitly confirm its numeric ID
+from their original secure website session. Before both invitation and joining, a fresh authenticated
+YooKassa GET must confirm the exact order/shop/amount/currency, succeeded, paid, non-test, no refund.
+15-minute invitations request approval; only the bound Telegram ID is approved; link then revoked.
+A provider outage gives no invitation/approval and retries preserve binding and existing invitation.
+Test payments cannot unlock this production chat; use mocked test suite or a separately isolated
+staging bot/chat for provider sandbox end-to-end validation. Never insert fake paid orders into production.
+Existing manual invite links/admin approvals are outside this workflow.
+Automatic removal after 3 months is not implemented; new invitations are blocked after expiry.
+Bot recovery from buyer losing their original browser session requires manual organizer support.
+Before launch, verify a real provider test flow in isolated staging and the final live configuration.
 Refunds are handled in YooKassa; automatic access revocation for refunds is not implemented yet.
 
 Testing: /opt/php/8.3/bin/php tests/payment-test.php
 The suite uses a fake transport and temporary SQLite database; it never contacts YooKassa or charges money.
+
+Telegram tests: /opt/php/8.3/bin/php tests/telegram-test.php

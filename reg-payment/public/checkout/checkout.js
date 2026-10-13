@@ -14,7 +14,7 @@ function showOrder(row){
  check.hidden=false;
  if(row.status==='succeeded'){
   notice.textContent=row.test?'Тестовая оплата подтверждена. Реальные деньги не списывались.':'Оплата подтверждена. Заказ сохранён. Доступ к обучению выдаётся через Telegram-бота.';
-  check.hidden=true;form.hidden=true;clearTimeout(timer);if(widget){widget.destroy();widget=null}return true;
+  showTelegram(row.telegram);check.hidden=true;form.hidden=true;clearTimeout(timer);if(widget){widget.destroy();widget=null}return true;
  }
  if(row.status==='canceled'){
   notice.textContent='Платёж отменён. Оплата не подтверждена.';form.hidden=true;check.hidden=true;clearTimeout(timer);if(widget){widget.destroy();widget=null}
@@ -59,3 +59,26 @@ form.addEventListener('submit',async e=>{
   form.hidden=false;
  }catch(e){notice.textContent=e.message||'Не удалось открыть оплату. Попробуйте позже.'}
 })();
+
+let candidateId='';
+function showTelegram(data){
+ const section=byId('telegramAccess');section.hidden=!data?.available;if(section.hidden)return;
+ byId('telegramLink').href=data.bot_url;
+ candidateId=data.candidate?.id||'';
+ const done=data.state==='invited'||data.state==='joined';
+ byId('telegramConfirm').hidden=!candidateId;
+ byId('telegramReset').hidden=!candidateId;
+ if(data.candidate){
+  const who=data.candidate.username?'@'+data.candidate.username:data.candidate.name;
+  byId('telegramInfo').textContent='Подтвердите, что это ваш аккаунт: '+who+' (ID '+candidateId+'). Если аккаунт чужой, нажмите «Это не мой аккаунт».';
+ } else byId('telegramInfo').textContent=data.state==='joined'?'Доступ выдан. Вы вступили в чат.':done?'Ссылка отправлена в Telegram. Откройте бота и подайте заявку на вступление.':'Откройте бота, нажмите «Начать», затем вернитесь сюда и проверьте Telegram. Приглашение получит только подтверждённый аккаунт.';
+}
+async function telegramAction(action,button){
+ button.disabled=true;
+ try{const row=await api(action,{order_id:orderId,candidate_id:candidateId});showOrder(row)}
+ catch(e){byId('telegramInfo').textContent=e.message}
+ finally{button.disabled=false}
+}
+byId('telegramRefresh').addEventListener('click',()=>telegramAction('status',byId('telegramRefresh')));
+byId('telegramConfirm').addEventListener('click',()=>telegramAction('telegram-confirm',byId('telegramConfirm')));
+byId('telegramReset').addEventListener('click',()=>telegramAction('telegram-reset',byId('telegramReset')));
