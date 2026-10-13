@@ -64,7 +64,8 @@ function telegram_browser(PDO $db, array $c, array $paymentConfig, array $row): 
     $token=rtrim(strtr(base64_encode(hash_hmac('sha256','telegram-claim:'.$row['id'],$paymentConfig['installation_secret'],true)),'+/','-_'),'=');
     $s=$db->prepare('INSERT OR IGNORE INTO telegram_access(order_id,claim_hash) VALUES(?,?)');$s->execute([$row['id'],hash('sha256',$token)]);
     $a=telegram_access($db,$row['id']);
-    return ['available'=>true,'bot_url'=>'https://t.me/'.$c['bot_username'].'?start='.$token,'state'=>$a['state'],
+    return ['available'=>true,'bot_url'=>'https://t.me/'.$c['bot_username'].'?start='.$token,'state'=>$a['state'],'bound_id'=>$a['user_id'],
+        'delivery_pending'=>$a['user_id']!==null && $a['state']!=='joined' && !$a['sent_at'],
         'candidate'=>$a['candidate_id']&&!$a['user_id']?['id'=>$a['candidate_id'],'name'=>$a['candidate_name'],'username'=>$a['candidate_username']]:null];
 }
 function telegram_deliver(PDO $db, array $c, string $id, callable $payments, callable $tg): void {

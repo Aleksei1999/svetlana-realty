@@ -64,14 +64,15 @@ let candidateId='';
 function showTelegram(data){
  const section=byId('telegramAccess');section.hidden=!data?.available;if(section.hidden)return;
  byId('telegramLink').href=data.bot_url;
- candidateId=data.candidate?.id||'';
+ candidateId=data.candidate?.id||data.bound_id||'';
  const done=data.state==='invited'||data.state==='joined';
- byId('telegramConfirm').hidden=!candidateId;
- byId('telegramReset').hidden=!candidateId;
+ byId('telegramConfirm').hidden=!data.candidate&&!data.delivery_pending;
+ byId('telegramConfirm').textContent=data.delivery_pending?'Повторить получение доступа':'Это мой аккаунт — получить доступ';
+ byId('telegramReset').hidden=!data.candidate;
  if(data.candidate){
   const who=data.candidate.username?'@'+data.candidate.username:data.candidate.name;
   byId('telegramInfo').textContent='Подтвердите, что это ваш аккаунт: '+who+' (ID '+candidateId+'). Если аккаунт чужой, нажмите «Это не мой аккаунт».';
- } else byId('telegramInfo').textContent=data.state==='joined'?'Доступ выдан. Вы вступили в чат.':done?'Ссылка отправлена в Telegram. Откройте бота и подайте заявку на вступление.':'Откройте бота, нажмите «Начать», затем вернитесь сюда и проверьте Telegram. Приглашение получит только подтверждённый аккаунт.';
+ } else byId('telegramInfo').textContent=data.delivery_pending?'Аккаунт подтверждён, но отправка ссылки ещё не завершена. Повторите получение доступа.':data.state==='joined'?'Доступ выдан. Вы вступили в чат.':done?'Ссылка отправлена в Telegram. Откройте бота и подайте заявку на вступление.':'Откройте бота, нажмите «Начать», затем вернитесь сюда и проверьте Telegram. Приглашение получит только подтверждённый аккаунт.';
 }
 async function telegramAction(action,button){
  button.disabled=true;
