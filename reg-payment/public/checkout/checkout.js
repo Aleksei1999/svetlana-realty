@@ -43,7 +43,7 @@ async function render(row){
 form.addEventListener('submit',async e=>{
  e.preventDefault();if(pay.disabled)return;pay.disabled=true;notice.textContent='Создаём заказ…';
  const values=Object.fromEntries(new FormData(form));values.consent=form.elements.consent.checked;values.request_id=requestId;
- try{await loadWidget();const row=await api('create',values);await render(row)}catch(e){notice.textContent=e.message}finally{pay.disabled=false}
+ try{await api('intent',values);const row=await api('create',values);await render(row)}catch(e){notice.textContent=e.message}finally{pay.disabled=false}
 });
 (async()=>{
  try{

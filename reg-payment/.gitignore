@@ -8,3 +8,7 @@ telegram-config.json
 telegram-token.txt
 
 yookassa-key.txt
+
+admin-auth.json
+admin-auth.tmp
+admin-password.txt

@@ -49,3 +49,9 @@ Testing: /opt/php/8.3/bin/php tests/payment-test.php
 The suite uses a fake transport and temporary SQLite database; it never contacts YooKassa or charges money.
 
 Telegram tests: /opt/php/8.3/bin/php tests/telegram-test.php
+
+Admin dashboard: /admin/ (private data requires password session).
+Install creates blank private admin-password.txt (0600). User supplies a 12–72 byte password there, then runs private/admin-password.php by CLI to hash it and clear the plaintext file. Do not publish credential files.
+Admin sessions expire after 30 minutes idle / 8 hours absolute. Password changes invalidate existing sessions. Login is rate-limited; all authenticated API actions require Origin + CSRF. Payment statuses cannot be changed by admin notes.
+Lead collection remains gated on approved documents. Magic applications are stored in leads. Checkout captures a consented intent before provider creation and widget loading; request_key prevents double-counting intent and resulting order. No anonymous visitor identity tracking. Existing unsubmitted forms cannot be recovered.
+Admin revenue means sum of confirmed successful payments, excludes test orders; refunds are not yet reconciled in CRM.

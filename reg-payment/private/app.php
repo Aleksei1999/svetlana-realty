@@ -2,6 +2,7 @@
 declare(strict_types=1);
 require_once __DIR__ . '/core.php';
 require_once __DIR__ . '/telegram.php';
+require_once __DIR__.'/admin-core.php';
 ini_set('display_errors', '0');
 umask(0077);
 header('Content-Type: application/json; charset=utf-8');
@@ -23,7 +24,7 @@ try {
     $db = payment_db(__DIR__);
     $api = fn($method,$path,$body=null,$key=null) => payment_api($c,$method,$path,$body,$key);
     $tc=telegram_config(__DIR__);
-    telegram_db($db);
+    telegram_db($db);crm_db($db);
     $tg=fn($method,$params=[])=>telegram_api($tc,$method,$params);
     $public=function($row)use($db,$tc,$c){$result=payment_public($row);$result['telegram']=telegram_browser($db,$tc,$c,$row);return $result;};
     $action = $_GET['action'] ?? '';
@@ -63,7 +64,7 @@ try {
     if ($action === 'bootstrap' && $_SERVER['REQUEST_METHOD']==='GET') {
         payment_rate($db, 'bootstrap:'.$ip, 60, 60);
         respond(['available'=>($c['enabled']??false)===true && payment_missing($c)===[], 'csrf'=>$csrf,
-            'test'=>($c['mode']??'')==='test', 'price'=>'4990.00', 'product'=>'Тариф «Старт»',
+            'leads_available'=>crm_docs_ready($c), 'test'=>($c['mode']??'')==='test', 'price'=>'4990.00', 'product'=>'Тариф «Старт»',
             'offer_url'=>$c['offer_url']??'', 'privacy_url'=>$c['privacy_url']??'', 'consent_url'=>$c['consent_url']??'']);
     }
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') throw new PaymentError(405,'POST required');
@@ -71,6 +72,11 @@ try {
     if (!in_array($origin,['https://www.xn--80ajklwp.site','https://xn--80ajklwp.site'],true)) throw new PaymentError(403,'Недопустимый источник запроса.');
     if (!hash_equals($csrf, $_SERVER['HTTP_X_CSRF_TOKEN']??'')) throw new PaymentError(403,'Обновите страницу оплаты.');
     $input=request_json();
+    if(in_array($action,['lead','intent'],true)){
+        payment_rate($db,'lead:'.$ip,10,3600);
+        $id=crm_lead($db,$c,$owner,$input,$action==='lead'?'magic':'intent');
+        respond(['saved'=>true,'id'=>$id]);
+    }
     if ($action==='create') {
         if (($c['enabled']??false)!==true || payment_missing($c)!==[]) throw new PaymentError(503,'Приём оплаты ещё настраивается. Деньги не списаны.');
         payment_rate($db,'create:'.$ip,12,3600);
