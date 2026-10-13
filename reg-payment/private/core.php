@@ -8,6 +8,10 @@ final class PaymentError extends RuntimeException {
 function payment_config(string $dir): array {
     $c = json_decode((string)file_get_contents($dir . '/config.json'), true, 32, JSON_THROW_ON_ERROR);
     if (!is_array($c)) throw new RuntimeException('Invalid configuration');
+    if (is_file($dir.'/yookassa-key.txt')) {
+        $key=trim((string)file_get_contents($dir.'/yookassa-key.txt'));
+        if ($key!=='') $c['secret_key']=$key;
+    }
     return $c;
 }
 function payment_missing(array $c): array {

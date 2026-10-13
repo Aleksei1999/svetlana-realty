@@ -30,4 +30,7 @@ $db->exec('UPDATE orders SET created_at=0 WHERE owner="owner-2"');rejects(fn()=>
 $bad=$input;$bad['consent']=false;rejects(fn()=>payment_customer($bad),'consent required');$bad=$input;$bad['email']='bad';rejects(fn()=>payment_customer($bad),'valid email required');
 ok(payment_missing(['mode'=>'live'])!==[],'unconfigured production is closed');
 payment_rate($db,'test',1,60);rejects(fn()=>payment_rate($db,'test',1,60),'rate limit enforced');
+file_put_contents($tmp.'/config.json',json_encode($c));file_put_contents($tmp.'/yookassa-key.txt',' fixture-key ');
+ok(payment_config($tmp)['secret_key']==='fixture-key','private key file loaded without changing enabled flag');
+file_put_contents($tmp.'/yookassa-key.txt','');ok(payment_config($tmp)['secret_key']==='test-only','empty key file preserves existing configured key');
 $db=null;foreach(glob($tmp.'/*')as$f)unlink($f);rmdir($tmp);echo "OK: $count assertions".PHP_EOL;

@@ -23,13 +23,16 @@ function telegram_api(array $c, string $method, array $params=[]): mixed {
     if (!in_array($method,['getUpdates','deleteWebhook','getMe','getChat','getChatMember','getWebhookInfo','setWebhook','sendMessage','createChatInviteLink','revokeChatInviteLink','approveChatJoinRequest','declineChatJoinRequest'],true)) throw new RuntimeException('Unsupported Telegram method');
     $h=curl_init('https://api.telegram.org/bot'.$c['token'].'/'.$method);
     curl_setopt_array($h,[CURLOPT_POST=>true,CURLOPT_POSTFIELDS=>json_encode($params?:new stdClass,JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR),
-        CURLOPT_HTTPHEADER=>['Content-Type: application/json'],CURLOPT_RETURNTRANSFER=>true,CURLOPT_CONNECTTIMEOUT=>5,CURLOPT_TIMEOUT=>12,
+        CURLOPT_HTTPHEADER=>['Content-Type: application/json'],CURLOPT_RETURNTRANSFER=>true,CURLOPT_CONNECTTIMEOUT=>10,CURLOPT_TIMEOUT=>30,
         CURLOPT_SSL_VERIFYPEER=>true,CURLOPT_SSL_VERIFYHOST=>2,CURLOPT_FOLLOWLOCATION=>false,
         CURLOPT_IPRESOLVE=>($c['ip_family']??6)===6?CURL_IPRESOLVE_V6:CURL_IPRESOLVE_WHATEVER]);
-    $raw=curl_exec($h);$status=(int)curl_getinfo($h,CURLINFO_RESPONSE_CODE);curl_close($h);
+    $raw=curl_exec($h);$status=(int)curl_getinfo($h,CURLINFO_RESPONSE_CODE);$errno=curl_errno($h);curl_close($h);
     $j=is_string($raw)?json_decode($raw,true):null;
     // Never log the URL, raw provider response, or token.
-    if ($status!==200 || !is_array($j) || ($j['ok']??false)!==true) throw new PaymentError(503,'Telegram временно недоступен. Повторите получение доступа позже.');
+    if ($status!==200 || !is_array($j) || ($j['ok']??false)!==true) {
+        error_log('realty-telegram: '.$method.' http='.$status.' curl='.$errno);
+        throw new PaymentError(503,'Telegram временно недоступен. Повторите получение доступа позже.');
+    }
     return $j['result'];
 }
 function telegram_auth(array $c, string $provided): void {
