@@ -34,7 +34,7 @@ async function render(row){
 async function verify(){if(!orderId||checking)return;checking=true;$('checkButton').disabled=true;try{const row=await api('probe-status',{order_id:orderId});const done=show(row);if(!done&&attempts++<24)timer=setTimeout(verify,5000)}catch(e){$('notice').textContent=e.message}finally{checking=false;$('checkButton').disabled=false}}
 async function boot(){
  clearTimeout(timer);$('refresh').disabled=true;$('fields').disabled=true;$('payButton').disabled=true;$('loginPrompt').hidden=true;
- try{const s=await api('session');csrf=s.csrf;if(!s.authenticated){$('loginPrompt').hidden=false;$('notice').textContent='Проверка доступна администратору. Войдите в кабинет. До подтверждения настроек чека оплата закрыта.';return}
+ try{const s=await api('session');csrf=s.csrf;if(!s.authenticated){$('loginPrompt').hidden=false;$('notice').textContent='Проверка доступна администратору. Войдите в кабинет, затем нажмите «Обновить доступность», чтобы открыть форму оплаты.';return}
   const c=await api('probe-bootstrap',{});available=c.available;$('notice').textContent=c.message;
   const previous=storage.get('realty_probe_order');if(previous){await render(await api('probe-status',{order_id:previous}));return}
   $('fields').disabled=!available;$('payButton').disabled=!available;
