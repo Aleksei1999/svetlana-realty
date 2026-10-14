@@ -29,6 +29,8 @@ rejects(fn()=>payment_order($db,$c,'owner-2',$input,$timeout),'retry still ambig
 $db->exec('UPDATE orders SET created_at=0 WHERE owner="owner-2"');rejects(fn()=>payment_order($db,$c,'owner-2',$input,$timeout),'expired idempotence window cannot create another payment');
 $bad=$input;$bad['consent']=false;rejects(fn()=>payment_customer($bad),'consent required');$bad=$input;$bad['email']='bad';rejects(fn()=>payment_customer($bad),'valid email required');
 ok(payment_missing(['mode'=>'live'])!==[],'unconfigured production is closed');
+$live=$c;$live['mode']='live';$live['documents_approved']=true;$live['fulfillment_ready']=true;foreach(['offer_url','privacy_url','consent_url']as$k)$live[$k]='https://www.xn--80ajklwp.site/legal/document.pdf';
+ok(in_array('test_payment_verified',payment_missing($live),true),'unverified launch closed by default');$live['launch_without_payment_test_approved']=true;ok(payment_missing($live)===[]&&empty($live['test_payment_verified']),'explicit owner launch preserves honest verification status');$live['receipt']['payment_mode']='';ok(in_array('receipt.payment_mode',payment_missing($live),true),'launch approval cannot bypass fiscal prerequisites');
 payment_rate($db,'test',1,60);rejects(fn()=>payment_rate($db,'test',1,60),'rate limit enforced');
 file_put_contents($tmp.'/config.json',json_encode($c));file_put_contents($tmp.'/yookassa-key.txt',' fixture-key ');
 ok(payment_config($tmp)['secret_key']==='fixture-key','private key file loaded without changing enabled flag');

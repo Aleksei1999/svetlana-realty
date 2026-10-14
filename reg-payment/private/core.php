@@ -23,9 +23,11 @@ function payment_missing(array $c): array {
     }
     // These are explicit release gates, not inferred from merely having an API key.
     if (($c['mode'] ?? '') === 'live') {
-        foreach (['documents_approved', 'fulfillment_ready', 'test_payment_verified'] as $key) {
+        foreach (['documents_approved', 'fulfillment_ready'] as $key) {
             if (($c[$key] ?? false) !== true) $missing[] = $key;
         }
+        // An explicit owner launch decision does not claim a payment test occurred.
+        if (($c['test_payment_verified'] ?? false) !== true && ($c['launch_without_payment_test_approved'] ?? false) !== true) $missing[] = 'test_payment_verified';
         if (empty($c['consent_version'])) $missing[] = 'consent_version';
         foreach (['offer_url', 'privacy_url', 'consent_url'] as $key) {
             if (!preg_match('~^https://(?:www\.)?xn--80ajklwp\.site/[^\s]+$~', $c[$key] ?? '')) $missing[] = $key;
