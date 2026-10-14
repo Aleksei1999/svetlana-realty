@@ -101,17 +101,19 @@ const info=$('#infoDialog');
 function openInfo(label,title,text){$('#infoLabel').textContent=label;$('#infoTitle').textContent=title;$('#infoText').textContent=text;info.showModal();}
 $$('[data-material]').forEach(b=>b.addEventListener('click',()=>openInfo('МАТЕРИАЛЫ ОБУЧЕНИЯ',...materials[Number(b.dataset.material)])));
 $('#infoAction').addEventListener('click',()=>{info.close();$('#formats').scrollIntoView({behavior:reduced.matches?'instant':'smooth'});});
-$$('[data-info]').forEach(b=>b.addEventListener('click',()=>openInfo('ПЕРЕД ОФОРМЛЕНИЕМ','Приём заявок готовится','Сейчас доступен предпросмотр программ и анкет. Оплата через ЮKassa, запись заявок в Google Таблицу, оферта и политика обработки персональных данных ещё не подключены. Обучение посвящено анализу недвижимости и не гарантирует инвестиционный результат.')));
+$$('[data-info]').forEach(b=>b.addEventListener('click',()=>location.assign('https://www.xn--80ajklwp.site/legal/')));
 const formDialog=$('#formDialog');
 $$('[data-form]').forEach(b=>b.addEventListener('click',()=>{
- const magic=b.dataset.form==='magic';$('#leadForm').reset();$('#formResult').textContent='';
- $('#formTitle').textContent=magic?'Встать в лист ожидания':'Старт';
- $('#formLabel').textContent=magic?'МАГИЯ ДОХОДНОЙ НЕДВИЖИМОСТИ':'7 ВИДЕОУРОКОВ / 4 990 ₽';
- $('#extraFields').innerHTML=magic?'<label>Опыт в недвижимости<select name="experience"><option>Пока нет опыта</option><option>Есть собственная недвижимость</option><option>Есть инвестиционный опыт</option></select></label><label>Цель участия<textarea name="goal" required placeholder="Чего хотите достичь"></textarea></label><label>Примерный капитал (необязательно)<input name="capital" placeholder="По желанию"></label><label>Главный вопрос<textarea name="question" placeholder="Что хотелось бы обсудить"></textarea></label>':'<label>Email<input name="email" type="email" autocomplete="email" required placeholder="you@example.com"></label>';
+ if(b.dataset.form==='start'){location.assign('https://www.xn--80ajklwp.site/checkout/');return;}
+ if(!['www.xn--80ajklwp.site','xn--80ajklwp.site'].includes(location.hostname)){location.assign('https://www.xn--80ajklwp.site/?apply=magic#formats');return;}
+ $('#leadForm').reset();$('#formResult').textContent='';
+ $('#formTitle').textContent='Встать в лист ожидания';
+ $('#formLabel').textContent='МАГИЯ ДОХОДНОЙ НЕДВИЖИМОСТИ';
+ $('#extraFields').innerHTML='<label>Опыт в недвижимости<select name="experience"><option>Пока нет опыта</option><option>Есть собственная недвижимость</option><option>Есть инвестиционный опыт</option></select></label><label>Цель участия<textarea name="goal" required placeholder="Чего хотите достичь"></textarea></label><label>Примерный капитал (необязательно)<input name="capital" placeholder="По желанию"></label><label>Главный вопрос<textarea name="question" placeholder="Что хотелось бы обсудить"></textarea></label>';
  formDialog.showModal();
 }));
+addEventListener('DOMContentLoaded',()=>{if(new URLSearchParams(location.search).get('apply')==='magic'&&['www.xn--80ajklwp.site','xn--80ajklwp.site'].includes(location.hostname))document.querySelector('[data-form="magic"]')?.click();},{once:true});
 $$('dialog').forEach(d=>{d.querySelector('.close').addEventListener('click',()=>d.close());d.addEventListener('click',e=>{if(e.target!==d)return;const r=d.getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)d.close();});});
-$('#leadForm').addEventListener('submit',e=>{e.preventDefault();$('#formResult').textContent='Поля заполнены корректно. Данные не отправлены: приём заявок и оплата пока не открыты.';});
 
 const reviewPlayers=$$('[data-review-video]');
 reviewPlayers.forEach(card=>{
