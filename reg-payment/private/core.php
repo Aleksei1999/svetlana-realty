@@ -46,6 +46,16 @@ function payment_db(string $dir): PDO {
         fulfillment_status TEXT NOT NULL DEFAULT "pending"
     )');
     $db->exec('CREATE TABLE IF NOT EXISTS rate_limits (bucket TEXT PRIMARY KEY, count INTEGER NOT NULL, expires INTEGER NOT NULL)');
+    // Preserve all existing course orders when introducing the private 10 RUB check.
+    $columns = $db->query('PRAGMA table_info(orders)')->fetchAll(PDO::FETCH_COLUMN, 1);
+    if (!in_array('product', $columns, true)) {
+        $db->beginTransaction();
+        try {
+            $columns = $db->query('PRAGMA table_info(orders)')->fetchAll(PDO::FETCH_COLUMN, 1);
+            if (!in_array('product', $columns, true)) $db->exec("ALTER TABLE orders ADD COLUMN product TEXT NOT NULL DEFAULT 'start'");
+            $db->commit();
+        } catch (Throwable $e) { $db->rollBack(); throw $e; }
+    }
     chmod($dir . '/payments.sqlite', 0600);
     return $db;
 }
@@ -78,16 +88,24 @@ function payment_customer(array $input): array {
     if (($input['consent'] ?? false) !== true) throw new PaymentError(422, 'Для оформления нужно согласие с документами.');
     return $out;
 }
-function payment_payload(array $c, string $id, string $email): array {
-    $item = ['description' => 'Тариф «Старт»: 7 видеоуроков', 'quantity' => '1.00',
-        'amount' => ['value' => '4990.00', 'currency' => 'RUB'],
+function payment_product(string $product): array {
+    return match ($product) {
+        'start' => ['amount' => '4990.00', 'description' => 'Тариф «Старт»: 7 видеоуроков', 'label' => 'Старт'],
+        'probe10' => ['amount' => '10.00', 'description' => 'Проверочный платёж', 'label' => 'Проверка оплаты'],
+        default => throw new PaymentError(422, 'Неверный тариф.'),
+    };
+}
+function payment_payload(array $c, string $id, string $email, string $product = 'start'): array {
+    $p = payment_product($product);
+    $item = ['description' => $p['description'], 'quantity' => '1.00',
+        'amount' => ['value' => $p['amount'], 'currency' => 'RUB'],
         'vat_code' => (int)$c['receipt']['vat_code'], 'payment_mode' => $c['receipt']['payment_mode'],
         'payment_subject' => $c['receipt']['payment_subject']];
     $receipt = ['customer' => ['email' => $email], 'items' => [$item]];
     if (isset($c['receipt']['tax_system_code'])) $receipt['tax_system_code'] = (int)$c['receipt']['tax_system_code'];
-    return ['amount' => ['value' => '4990.00', 'currency' => 'RUB'], 'capture' => true,
-        'confirmation' => ['type' => 'embedded'], 'description' => 'Старт — заказ ' . $id,
-        'metadata' => ['order_id' => $id, 'product' => 'start'], 'receipt' => $receipt];
+    return ['amount' => ['value' => $p['amount'], 'currency' => 'RUB'], 'capture' => true,
+        'confirmation' => ['type' => 'embedded'], 'description' => $p['label'] . ' — заказ ' . $id,
+        'metadata' => ['order_id' => $id, 'product' => $product], 'receipt' => $receipt];
 }
 function payment_api(array $c, string $method, string $path, ?array $body = null, ?string $idempotency = null): array {
     if (!preg_match('~^payments(?:/[a-zA-Z0-9-]{1,64})?$~D', $path)) throw new RuntimeException('Invalid API path');
@@ -113,6 +131,9 @@ function payment_validate(array $order, array $payment): void {
         is_string($payment['id'] ?? null) && preg_match('/^[a-zA-Z0-9-]{1,64}$/D', $payment['id']),
         empty($order['payment_id']) || ($payment['id'] ?? '') === $order['payment_id'],
         ($payment['metadata']['order_id'] ?? '') === $order['id'],
+        ($order['product'] ?? 'start') === 'start'
+            ? in_array($payment['metadata']['product'] ?? 'start', ['start'], true)
+            : ($payment['metadata']['product'] ?? '') === $order['product'],
         ($payment['amount']['value'] ?? '') === $order['amount'],
         ($payment['amount']['currency'] ?? '') === $order['currency'],
         (string)($payment['recipient']['account_id'] ?? '') === $order['shop_id'],
@@ -128,6 +149,11 @@ function payment_apply(PDO $db, array $order, array $payment): void {
     $s = $db->prepare('UPDATE orders SET payment_id=?, status=?, confirmation_token=?, checked_at=?, paid_at=COALESCE(paid_at,?), receipt_status=? WHERE id=? AND status NOT IN ("succeeded","canceled")');
     $s->execute([$payment['id'], $payment['status'], $payment['confirmation']['confirmation_token'] ?? $order['confirmation_token'] ?? null,
         time(), $payment['status'] === 'succeeded' ? time() : null, $payment['receipt_registration'] ?? null, $order['id']]);
+    // Receipt registration can finish after the payment. Never downgrade a registered receipt.
+    if ($payment['status'] === 'succeeded' && isset($payment['receipt_registration'])) {
+        $s = $db->prepare('UPDATE orders SET receipt_status=?,checked_at=? WHERE id=? AND status="succeeded" AND COALESCE(receipt_status,"")!="succeeded"');
+        $s->execute([$payment['receipt_registration'],time(),$order['id']]);
+    }
 }
 function payment_find(PDO $db, string $id): ?array {
     $s = $db->prepare('SELECT * FROM orders WHERE id=?'); $s->execute([$id]);
@@ -139,19 +165,21 @@ function payment_public(array $row): array {
         'confirmation_token' => $row['status'] === 'pending' ? $row['confirmation_token'] : null,
         'fulfillment_status' => $row['fulfillment_status']];
 }
-function payment_order(PDO $db, array $c, string $owner, array $input, callable $api): array {
+function payment_order(PDO $db, array $c, string $owner, array $input, callable $api, string $product = 'start'): array {
+    $p = payment_product($product); // Product is supplied by the server route, never by the customer's form.
     $customer = payment_customer($input);
     $key = $input['request_id'] ?? '';
     if (!is_string($key) || !preg_match('/^[a-f0-9]{32}$/D', $key)) throw new PaymentError(422, 'Обновите страницу оплаты.');
     $requestKey = hash('sha256', $owner . ':' . $key);
     $s = $db->prepare('SELECT * FROM orders WHERE request_key=?'); $s->execute([$requestKey]);
     $row = $s->fetch(PDO::FETCH_ASSOC);
+    if ($row && $row['product'] !== $product) throw new PaymentError(409, 'Заказ относится к другому тарифу.');
     if (!$row) {
         $id = bin2hex(random_bytes(16));
-        $payload = payment_payload($c, $id, $customer['email']);
-        $s = $db->prepare('INSERT INTO orders (id,owner,request_key,name,email,phone,telegram,amount,currency,shop_id,test,status,payload,created_at,consent_version) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)');
+        $payload = payment_payload($c, $id, $customer['email'], $product);
+        $s = $db->prepare('INSERT INTO orders (id,owner,request_key,name,email,phone,telegram,amount,currency,shop_id,test,status,payload,created_at,consent_version,product,fulfillment_status) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)');
         $s->execute([$id,$owner,$requestKey,$customer['name'],$customer['email'],$customer['phone'],$customer['telegram'],
-            '4990.00','RUB',(string)$c['shop_id'],($c['mode']==='test'?1:0),'creating',json_encode($payload,JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR),time(),$c['consent_version'] ?? 'unconfigured']);
+            $p['amount'],'RUB',(string)$c['shop_id'],($c['mode']==='test'?1:0),'creating',json_encode($payload,JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR),time(),$c['consent_version'] ?? 'unconfigured',$product,$product==='probe10'?'not_applicable':'pending']);
         $row = payment_find($db, $id);
     }
     if ($row['payment_id']) return $row;

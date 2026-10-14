@@ -1,6 +1,7 @@
 <?php
 declare(strict_types=1);
 require_once __DIR__.'/admin-core.php';
+require_once __DIR__.'/probe.php';
 ini_set('display_errors','0');umask(0077);
 header('Content-Type: application/json; charset=utf-8');header('Cache-Control: no-store, private');header('X-Content-Type-Options: nosniff');header('Referrer-Policy: no-referrer');header('X-Frame-Options: DENY');
 function admin_reply(array $v,int $code=200): never {http_response_code($code);echo json_encode($v,JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR);exit;}
@@ -21,11 +22,15 @@ try{
  }
  if(!$auth)throw new PaymentError(401,'Войдите в кабинет.');$_SESSION['seen_at']=time();
  if($action==='logout'){$_SESSION=[];session_destroy();setcookie('__Host-realty_admin','',['expires'=>time()-3600,'path'=>'/','secure'=>true,'httponly'=>true,'samesite'=>'Strict']);admin_reply(['ok'=>true]);}
+ if(str_starts_with($action,'probe-')){
+  $owner=hash_hmac('sha256','admin-probe:'.$ac['version'],$c['installation_secret']);
+  admin_reply(probe_action($action,$db,$c,$owner,$in,__DIR__,fn($m,$p,$b=null,$k=null)=>payment_api($c,$m,$p,$b,$k)));
+ }
  if($action==='data'){
-  $all=crm_rows($db);$live=array_values(array_filter($all,fn($r)=>!$r['test']));$paid=array_filter($live,fn($r)=>$r['type']==='order'&&$r['status']==='succeeded');
+  $all=crm_rows($db);$live=array_values(array_filter($all,fn($r)=>!$r['test']&&!$r['probe']));$paid=array_filter($live,fn($r)=>$r['type']==='order'&&$r['status']==='succeeded');
   $stats=['leads'=>count(array_filter($live,fn($r)=>$r['type']==='lead'&&$r['product']==='Магия')),'paid'=>count($paid),'intent'=>count(array_filter($live,fn($r)=>$r['status']==='intent'||$r['status']==='creating')),'unpaid'=>count(array_filter($live,fn($r)=>$r['type']==='order'&&$r['status']!=='succeeded')),'revenue'=>array_sum(array_map(fn($r)=>(float)$r['amount'],$paid))];
   $query=trim((string)($in['query']??''));$filter=$in['filter']??'all';$test=($in['test']??false)===true;
-  $filtered=array_values(array_filter($all,function($r)use($query,$filter,$test){if($r['test']!==$test)return false;if($query!==''&&stripos(implode(' ',[$r['id'],$r['name'],$r['email'],$r['phone'],$r['telegram']]),$query)===false)return false;return match($filter){'leads'=>$r['type']==='lead'&&$r['product']==='Магия','paid'=>$r['status']==='succeeded','unpaid'=>$r['type']==='order'&&$r['status']!=='succeeded','intent'=>in_array($r['status'],['intent','creating'],true),default=>true};}));
+  $filtered=array_values(array_filter($all,function($r)use($query,$filter,$test){if(($r['test']||$r['probe'])!==$test)return false;if($query!==''&&stripos(implode(' ',[$r['id'],$r['name'],$r['email'],$r['phone'],$r['telegram']]),$query)===false)return false;return match($filter){'leads'=>$r['type']==='lead'&&$r['product']==='Магия','paid'=>$r['status']==='succeeded','unpaid'=>$r['type']==='order'&&$r['status']!=='succeeded','intent'=>in_array($r['status'],['intent','creating'],true),default=>true};}));
   $page=max(1,(int)($in['page']??1));$pages=max(1,(int)ceil(count($filtered)/30));$page=min($page,$pages);
   admin_reply(['rows'=>array_slice($filtered,($page-1)*30,30),'total'=>count($filtered),'page'=>$page,'pages'=>$pages,'stats'=>$stats,'payments_enabled'=>($c['enabled']??false)&&payment_missing($c)===[],'leads_enabled'=>crm_docs_ready($c),'updated_at'=>time()]);
  }

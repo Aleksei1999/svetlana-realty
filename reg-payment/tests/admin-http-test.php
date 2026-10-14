@@ -2,7 +2,7 @@
 declare(strict_types=1);
 require __DIR__.'/../private/admin-core.php';
 $root=sys_get_temp_dir().'/admin-http-'.bin2hex(random_bytes(8));mkdir($root,0700);mkdir($root.'/sessions',0700);mkdir($root.'/locks',0700);
-foreach(['admin-app.php','admin-core.php','core.php','telegram.php']as$f)copy(__DIR__.'/../private/'.$f,$root.'/'.$f);
+foreach(['admin-app.php','admin-core.php','core.php','telegram.php','probe.php']as$f)copy(__DIR__.'/../private/'.$f,$root.'/'.$f);
 file_put_contents($root.'/index.php','<?php require __DIR__."/admin-app.php";');
 file_put_contents($root.'/config.json',json_encode(['enabled'=>false,'mode'=>'live','installation_secret'=>bin2hex(random_bytes(32))]));
 $pw=bin2hex(random_bytes(18));file_put_contents($root.'/admin-auth.json',json_encode(['password_hash'=>password_hash($pw,PASSWORD_DEFAULT),'version'=>'qa-only']));
@@ -15,11 +15,16 @@ try{
  ok($code===200&&!$s['authenticated']&&$s['configured'],'login session bootstraps');$csrf=$s['csrf'];$old=$cookie;
  ok(str_contains($headers,'secure')&&str_contains(strtolower($headers),'httponly')&&str_contains($headers,'SameSite=Strict'),'secure admin cookie flags');
  [$code]=req('data',[]);ok($code===401,'anonymous cannot read data');
+ foreach(['probe-bootstrap','probe-create','probe-status']as$a){[$code]=req($a,[]);ok($code===401,'anonymous denied '.$a);}
  [$code]=req('login',['password'=>$pw],'https://example.com');ok($code===403,'cross origin login denied');
  [$code]=req('login',['password'=>$pw],'https://www.xn--80ajklwp.site','wrong');ok($code===403,'wrong csrf denied');
  [$code]=req('login',['password'=>'wrong']);ok($code===401,'wrong password denied');
  [$code,$s]=req('login',['password'=>$pw]);ok($code===200&&$s['authenticated'],'password login works');ok($cookie!==$old,'session id rotates at login');$csrf=$s['csrf'];
  [$code,$data,$headers]=req('data',[]);ok($code===200&&$data['rows']===[]&&$data['stats']['paid']===0,'authenticated dashboard reads empty database');ok(str_contains($headers,'no-store'),'responses not cached');
+ [$code,$probe]=req('probe-bootstrap',[]);ok($code===200&&!$probe['available']&&$probe['amount']==='10.00','admin sees locked probe');
+ [$code]=req('probe-create',[]);ok($code===503,'disabled probe blocked server side');
+ [$code]=req('probe-create',[],'https://example.com');ok($code===403,'cross origin probe rejected');
+ [$code]=req('probe-create',[],'https://www.xn--80ajklwp.site','bad');ok($code===403,'probe csrf required');
  [$code]=req('save',['id'=>str_repeat('a',32),'type'=>'order','note'=>'qa']);ok($code===404,'unknown order edit denied');
  [$code]=req('logout',[]);ok($code===200,'logout works');[$code]=req('data',[]);ok(in_array($code,[401,403]),'logout revokes access');
  [$code,$s]=req('session');$csrf=$s['csrf'];for($i=0;$i<8;$i++)[$code]=req('login',['password'=>'wrong']);ok($code===429,'password brute force throttled');

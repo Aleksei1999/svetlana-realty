@@ -48,6 +48,7 @@ function telegram_access(PDO $db, string $id): ?array {
     $s=$db->prepare('SELECT * FROM telegram_access WHERE order_id=?');$s->execute([$id]);return $s->fetch(PDO::FETCH_ASSOC)?:null;
 }
 function telegram_eligible(array $r): bool {
+    if (($r['product'] ?? 'start') !== 'start') return false;
     if ($r['status']!=='succeeded' || empty($r['payment_id']) || empty($r['paid_at']) || (bool)$r['test']) return false;
     $end=(new DateTimeImmutable('@'.(int)$r['paid_at']))->modify('+3 months')->getTimestamp();
     return $r['amount']==='4990.00' && $r['currency']==='RUB' && $end>time();
