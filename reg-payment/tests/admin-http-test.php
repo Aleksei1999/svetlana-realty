@@ -21,6 +21,13 @@ try{
  [$code]=req('login',['password'=>'wrong']);ok($code===401,'wrong password denied');
  [$code,$s]=req('login',['password'=>$pw]);ok($code===200&&$s['authenticated'],'password login works');ok($cookie!==$old,'session id rotates at login');$csrf=$s['csrf'];
  [$code,$data,$headers]=req('data',[]);ok($code===200&&$data['rows']===[]&&$data['stats']['paid']===0,'authenticated dashboard reads empty database');ok(str_contains($headers,'no-store'),'responses not cached');
+ $fixture=payment_db($root);telegram_db($fixture);crm_db($fixture);
+ $fc=['shop_id'=>'fixture','mode'=>'live','receipt'=>['vat_code'=>1,'payment_mode'=>'full_payment','payment_subject'=>'service'],'consent_version'=>'fixture'];
+ $fi=['name'=>'Fixture','email'=>'fixture@example.invalid','phone'=>'+70000000000','telegram'=>'fixture_user','consent'=>true,'request_id'=>str_repeat('a',32)];
+ $provider=fn($m,$p,$b,$k)=>['id'=>'fixture-'.$k,'metadata'=>$b['metadata'],'amount'=>$b['amount'],'recipient'=>['account_id'=>'fixture'],'test'=>false,'paid'=>true,'status'=>'succeeded'];
+ $probeOrder=payment_order($fixture,$fc,'fixture-probe',$fi,$provider,'probe10');$courseOrder=payment_order($fixture,$fc,'fixture-course',$fi,$provider);
+ [$code,$data]=req('data',[]);ok($code===200&&count($data['rows'])===1&&$data['rows'][0]['id']===$courseOrder['id'],'live view excludes probe');ok($data['stats']['paid']===1&&(float)$data['stats']['revenue']===4990.0,'probe excluded from course revenue and paid count');
+ [$code,$data]=req('data',['test'=>true]);ok($code===200&&count($data['rows'])===1&&$data['rows'][0]['id']===$probeOrder['id']&&$data['rows'][0]['probe']&&!$data['rows'][0]['test'],'checks view includes real 10 RUB probe with correct mode');$fixture=null;
  [$code,$probe]=req('probe-bootstrap',[]);ok($code===200&&!$probe['available']&&$probe['amount']==='10.00','admin sees locked probe');
  [$code]=req('probe-create',[]);ok($code===503,'disabled probe blocked server side');
  [$code]=req('probe-create',[],'https://example.com');ok($code===403,'cross origin probe rejected');

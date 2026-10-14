@@ -151,7 +151,7 @@ function payment_apply(PDO $db, array $order, array $payment): void {
         time(), $payment['status'] === 'succeeded' ? time() : null, $payment['receipt_registration'] ?? null, $order['id']]);
     // Receipt registration can finish after the payment. Never downgrade a registered receipt.
     if ($payment['status'] === 'succeeded' && isset($payment['receipt_registration'])) {
-        $s = $db->prepare('UPDATE orders SET receipt_status=?,checked_at=? WHERE id=? AND status="succeeded" AND COALESCE(receipt_status,"")!="succeeded"');
+        $s = $db->prepare('UPDATE orders SET receipt_status=CASE WHEN receipt_status="succeeded" THEN receipt_status ELSE ? END,checked_at=? WHERE id=? AND status="succeeded"');
         $s->execute([$payment['receipt_registration'],time(),$order['id']]);
     }
 }
