@@ -29,3 +29,5 @@ $html=file_get_contents($public.'/index.html');
 $html=str_replace('<button class="text-button" data-info="legal">Информация перед оформлением ↗</button>','<a class="text-button" href="/legal/">Документы ↗</a>',$html);
 $html=preg_replace('~/lead-entry\.js\?v=[^"\s]+~','/lead-entry.js?v=legal-20261014',$html);
 file_put_contents($public.'/index.html',$html);
+
+require __DIR__."/metrika-install.php";
